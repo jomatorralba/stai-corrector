@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STAI Scorer | Herramienta Neuropsicológica</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              accent: '#0070f3',
+              'accent-light': '#3291ff',
+              surface: '#fafafa',
+            }
+          }
+        }
+      }
+    </script>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+      /* Custom scrollbar for cleaner look */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #999;
+      }
+      .animate-fade-in {
+        animation: fadeIn 0.5s ease-out forwards;
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.3",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-surface text-neutral-800 antialiased">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect, useCallback } = React;
+
+      // --- CONSTANTS & DATA ---
+
+      const REVERSED_STATE = [1, 2, 5, 8, 10, 11, 15, 16, 19, 20];
+      const REVERSED_TRAIT = [21, 26, 27, 30, 33, 36, 39];
+
+      const NORMATIVE_TABLE = [
+        { pc: 99, decat: 10, scores: [47, 46, 53, 49, 47, 46, 54, 49] },
+        { pc: 97, decat: 9, scores:  [45, 41, 44, 43, 43, 39, 49, 45] },
+        { pc: 96, decat: 9, scores:  [44, 40, 42, 42, 42, 38, 48, 44] },
+        { pc: 95, decat: 9, scores:  [43, 39, 41, 41, 40, 37, 47, 43] },
+        { pc: 90, decat: 8, scores:  [38, 33, 39, 36, 37, 33, 41, 40] },
+        { pc: 89, decat: 8, scores:  [37, 32, 38, 35, 36, 32, 40, 39] },
+        { pc: 85, decat: 8, scores:  [36, 30, 36, 33, 33, 29, 37, 37] },
+        { pc: 80, decat: 7, scores:  [34, 28, 34, 31, 30, 27, 34, 34] },
+        { pc: 77, decat: 7, scores:  [32, 27, 33, 30, 29, 26, 32, 33] },
+        { pc: 75, decat: 7, scores:  [31, 26, 31, 29, 28, 25, 31, 32] },
+        { pc: 70, decat: 7, scores:  [28, 24, 28, 27, 25, 24, 29, 30] },
+        { pc: 65, decat: 6, scores:  [26, 23, 26, 26, 23, 23, 26, 29] },
+        { pc: 60, decat: 6, scores:  [24, 22, 25, 25, 21, 21, 24, 27] },
+        { pc: 55, decat: 6, scores:  [22, 21, 23, 23, 20, 20, 23, 26] },
+        { pc: 50, decat: 6, scores:  [20, 20, 22, 22, 19, 19, 21, 24] },
+        { pc: 45, decat: 5, scores:  [19, 19, 20, 21, 18, 18, 19, 23] },
+        { pc: 40, decat: 5, scores:  [17, 18, 19, 20, 16, 17, 18, 21] },
+        { pc: 35, decat: 5, scores:  [16, 17, 18, 19, 15, 16, 17, 20] },
+        { pc: 30, decat: 4, scores:  [14, 16, 17, 18, -1, 15, 16, 18] },
+        { pc: 25, decat: 4, scores:  [13, 15, 16, 17, 14, 14, 15, 17] },
+        { pc: 23, decat: 4, scores:  [-1, -1, 15, -1, 13, -1, 14, -1] },
+        { pc: 20, decat: 4, scores:  [12, 14, 14, 16, 12, 13, 13, 16] },
+        { pc: 15, decat: 3, scores:  [11, 13, 13, 15, 10, 11, 12, 14] },
+        { pc: 11, decat: 3, scores:  [-1, -1, 12, 14, 9, 10, 11, 13] },
+        { pc: 10, decat: 3, scores:  [10, 12, 11, 13, 8, 9, 10, 12] },
+        { pc: 5, decat: 2, scores:   [9, 11, 8, 12, 6, 8, 7, 11] },
+        { pc: 4, decat: 2, scores:   [8, 10, 7, 11, 5, 7, 6, 10] },
+        { pc: 1, decat: 1, scores:   [0, 0, 0, 0, 0, 0, 0, 0] }
+      ];
+
+      function getInterpretationFromDecatype(decatype) {
+        if (decatype >= 9) {
+          return {
+            label: "Ansiedad Muy Alta",
+            color: "text-red-700 bg-red-100 border-red-300",
+            description: "Puntuación en el extremo superior (Decatipos 9-10). Sugiere niveles clínicamente significativos."
+          };
+        } else if (decatype >= 7) {
+          return {
+            label: "Ansiedad Alta",
+            color: "text-orange-600 bg-orange-50 border-orange-200",
+            description: "Puntuación por encima de la media (Decatipos 7-8)."
+          };
+        } else if (decatype >= 4) {
+          return {
+            label: "Promedio",
+            color: "text-blue-600 bg-blue-50 border-blue-200",
+            description: "Puntuación dentro de la normalidad estadística (Decatipos 4-6)."
+          };
+        } else {
+          return {
+            label: "Ansiedad Baja",
+            color: "text-green-600 bg-green-50 border-green-200",
+            description: "Puntuación por debajo de la media (Decatipos 1-3)."
+          };
+        }
+      }
+
+      function getColumnIndex(group, gender, scale) {
+        if (group === 'ADOLESCENT') {
+          if (gender === 'MALE') return scale === 'STATE' ? 0 : 1;
+          if (gender === 'FEMALE') return scale === 'STATE' ? 2 : 3;
+        } else {
+          if (gender === 'MALE') return scale === 'STATE' ? 4 : 5;
+          if (gender === 'FEMALE') return scale === 'STATE' ? 6 : 7;
+        }
+        return 0;
+      }
+
+      function getNormativeData(rawScore, group, gender, scale) {
+        const colIndex = getColumnIndex(group, gender, scale);
+        
+        for (const row of NORMATIVE_TABLE) {
+          const cutoff = row.scores[colIndex];
+          if (cutoff !== -1 && rawScore >= cutoff) {
+            return { percentile: row.pc, decatype: row.decat };
+          }
+        }
+        return { percentile: 1, decatype: 1 };
+      }
+
+      // --- COMPONENTS ---
+
+      const Navbar = () => {
+        return (
+          <nav className="fixed top-0 left-0 right-0 z-[60] h-14 bg-white/80 backdrop-blur-md border-b border-neutral-200 flex items-center justify-between px-4 md:px-8 transition-all duration-300">
+            <div className="flex items-center">
+              <span className="text-sm md:text-base font-bold text-neutral-800 tracking-tight">
+                STAI CORRECTOR
+              </span>
+            </div>
+            <div className="flex items-center">
+              <span className="text-xs md:text-sm font-medium text-neutral-600 tracking-wide font-sans">
+                JM Torralba
+              </span>
+            </div>
+          </nav>
+        );
+      };
+
+      const Header = () => {
+        return (
+          <header className="mb-8 text-center pt-8 pb-4">
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-neutral-900 mb-2">
+              STAI Scorer
+            </h1>
+            <div className="w-16 h-1 bg-accent mx-auto mt-4 rounded-full opacity-80"></div>
+          </header>
+        );
+      };
+
+      const ProgressBar = ({ filledCount, totalCount }) => {
+        const percentage = Math.round((filledCount / totalCount) * 100);
+
+        return (
+          <div className="sticky top-14 z-50 bg-surface/90 backdrop-blur-md py-4 border-b border-neutral-200 mb-8 transition-all">
+            <div className="max-w-[900px] mx-auto px-4">
+              <div className="flex justify-between items-end mb-2">
+                <span className="text-xs font-bold text-accent uppercase tracking-wider">
+                  Progreso de Evaluación
+                </span>
+                <span className="text-xs font-mono text-neutral-500">
+                  {filledCount} / {totalCount} ({percentage}%)
+                </span>
+              </div>
+              <div className="h-2 w-full bg-neutral-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-accent transition-all duration-500 ease-out"
+                  style={{ width: `${percentage}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const InputGrid = ({ 
+        title, 
+        startIndex, 
+        endIndex, 
+        reversedIndices, 
+        values, 
+        onChange,
+        description
+      }) => {
+        const items = Array.from({ length: endIndex - startIndex + 1 }, (_, i) => startIndex + i);
+
+        const handleInputChange = (index, valStr) => {
+          if (valStr === '') {
+            onChange(index, null);
+            return;
+          }
+
+          const val = parseInt(valStr, 10);
+          
+          if (!isNaN(val) && val >= 0 && val <= 3) {
+            onChange(index, val);
+
+            if (valStr.length === 1) {
+              const nextId = `item-${index + 1}`;
+              const nextElement = document.getElementById(nextId);
+              if (nextElement) {
+                nextElement.focus();
+                nextElement.select(); 
+              }
+            }
+          }
+        };
+
+        return (
+          <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex justify-between items-center border-b border-neutral-100 pb-4 mb-6">
+              <h2 className="text-lg font-semibold text-neutral-800">{title}</h2>
+              <span className="text-xs bg-neutral-100 text-neutral-500 px-3 py-1 rounded-full font-medium">
+                Ítems {startIndex}-{endIndex}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-5 gap-3 md:gap-4">
+              {items.map((itemNum) => {
+                const isReversed = reversedIndices.includes(itemNum);
+                const value = values[itemNum];
+                const isFilled = value !== null && value !== undefined;
+
+                return (
+                  <div key={itemNum} className="flex flex-col items-center group">
+                    <label 
+                      htmlFor={`item-${itemNum}`} 
+                      className={`text-xs mb-1.5 font-mono ${isReversed ? 'text-accent font-bold' : 'text-neutral-400'}`}
+                      title={isReversed ? "Ítem Inverso" : "Ítem Directo"}
+                    >
+                      {itemNum}{isReversed && '*'}
+                    </label>
+                    <input
+                      id={`item-${itemNum}`}
+                      type="number"
+                      min="0"
+                      max="3"
+                      placeholder="-"
+                      value={isFilled ? value : ''}
+                      onChange={(e) => handleInputChange(itemNum, e.target.value)}
+                      className={`
+                        w-full h-10 md:h-12 text-center text-lg border rounded-lg transition-all duration-200
+                        focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent
+                        ${isFilled 
+                          ? 'bg-neutral-50 border-neutral-300 font-bold text-neutral-900' 
+                          : 'bg-white border-neutral-200 text-neutral-400'}
+                        [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
+                      `}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            
+            <p className="mt-4 text-[10px] text-neutral-400 text-center">
+              {description}
+            </p>
+          </div>
+        );
+      };
+
+      const ScoreCard = ({ title, raw, pc, decat }) => {
+        const interpretation = getInterpretationFromDecatype(decat);
+
+        return (
+          <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+            <div className={`absolute top-0 left-0 w-2 h-full ${interpretation.color.replace('text-', 'bg-').split(' ')[0]}`}></div>
+            <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-4 pl-3">{title}</h3>
+            
+            <div className="grid grid-cols-3 gap-4 text-center mb-6 pl-2">
+              <div>
+                <div className="text-xs text-neutral-400 mb-1">Directa</div>
+                <div className="text-2xl font-bold text-neutral-800">{raw}</div>
+              </div>
+              <div>
+                <div className="text-xs text-neutral-400 mb-1">Centil</div>
+                <div className="text-2xl font-bold text-accent">{pc}</div>
+              </div>
+              <div>
+                <div className="text-xs text-neutral-400 mb-1">Decatipo</div>
+                <div className="text-2xl font-bold text-neutral-800">{decat}</div>
+              </div>
+            </div>
+
+            <div className={`pl-3 p-3 rounded-lg ${interpretation.color}`}>
+              <div className="font-bold text-sm">{interpretation.label}</div>
+              <div className="text-xs opacity-90 mt-1">{interpretation.description}</div>
+            </div>
+          </div>
+        );
+      };
+
+      const ResultsPanel = ({ results }) => {
+        return (
+          <div className="mt-10 animate-fade-in space-y-8">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold text-neutral-800">Informe de Resultados</h2>
+              <p className="text-neutral-500 text-sm">Corrección basada en baremos poblacionales específicos.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <ScoreCard 
+                title="Ansiedad Estado (A-E)" 
+                raw={results.rawScoreState}
+                pc={results.stateNorms.percentile}
+                decat={results.stateNorms.decatype}
+              />
+              <ScoreCard 
+                title="Ansiedad Rasgo (A-R)" 
+                raw={results.rawScoreTrait}
+                pc={results.traitNorms.percentile}
+                decat={results.traitNorms.decatype}
+              />
+            </div>
+
+            <div className="bg-neutral-50 p-6 rounded-xl border border-neutral-200 text-xs text-neutral-500 space-y-2">
+              <p className="font-semibold text-neutral-700">Nota sobre los Baremos:</p>
+              <p>
+                Las puntuaciones directas (PD) han sido transformadas a Centiles (Pc) y Decatipos 
+                utilizando las tablas normativas para la población seleccionada.
+              </p>
+              <ul className="list-disc list-inside ml-2 space-y-1">
+                <li><strong>Centil (Pc):</strong> Indica el porcentaje de la población normativa que obtiene una puntuación igual o inferior. (Ej: Pc 99 significa que el sujeto puntúa por encima del 99% de la población).</li>
+                <li><strong>Decatipo:</strong> Escala típica de 10 puntos (Media=5.5, DT=2). Decatipos 9-10 indican desviación clínica significativa.</li>
+              </ul>
+            </div>
+          </div>
+        );
+      };
+
+      // --- APP ---
+
+      const App = () => {
+        const [answers, setAnswers] = useState({});
+        const [result, setResult] = useState(null);
+        
+        // Profile State
+        const [gender, setGender] = useState('MALE');
+        const [ageGroup, setAgeGroup] = useState('ADULT');
+
+        const handleValueChange = useCallback((index, value) => {
+          setAnswers(prev => ({
+            ...prev,
+            [index]: value
+          }));
+          if (result) setResult(null);
+        }, [result]);
+
+        const handleProfileChange = () => {
+          if (result) {
+            setResult(null);
+          }
+        };
+
+        const calculateResults = () => {
+          let rawScoreState = 0;
+          let rawScoreTrait = 0;
+          const missing = [];
+
+          // Calculate State (1-20)
+          for (let i = 1; i <= 20; i++) {
+            const val = answers[i];
+            if (val === null || val === undefined) {
+              missing.push(i);
+            } else {
+              if (REVERSED_STATE.includes(i)) {
+                rawScoreState += (3 - val);
+              } else {
+                rawScoreState += val;
+              }
+            }
+          }
+
+          // Calculate Trait (21-40)
+          for (let i = 21; i <= 40; i++) {
+            const val = answers[i];
+            if (val === null || val === undefined) {
+              missing.push(i);
+            } else {
+              if (REVERSED_TRAIT.includes(i)) {
+                rawScoreTrait += (3 - val);
+              } else {
+                rawScoreTrait += val;
+              }
+            }
+          }
+
+          if (missing.length > 0) {
+            alert(`Por favor, complete los ítems faltantes: ${missing.join(', ')}`);
+            return;
+          }
+
+          // Lookup Norms
+          const stateNorms = getNormativeData(rawScoreState, ageGroup, gender, 'STATE');
+          const traitNorms = getNormativeData(rawScoreTrait, ageGroup, gender, 'TRAIT');
+
+          setResult({
+            rawScoreState,
+            rawScoreTrait,
+            stateNorms,
+            traitNorms
+          });
+
+          setTimeout(() => {
+            document.getElementById('results-anchor')?.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        };
+
+        const resetForm = () => {
+          if (window.confirm('¿Estás seguro de que quieres borrar todos los datos?')) {
+            setAnswers({});
+            setResult(null);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        };
+
+        const filledCount = Object.values(answers).filter(v => v !== null && v !== undefined).length;
+
+        return (
+          <div className="min-h-screen pb-20 pt-14">
+            <Navbar />
+            <ProgressBar filledCount={filledCount} totalCount={40} />
+            
+            <div className="max-w-[900px] mx-auto px-4 sm:px-6">
+              <Header />
+
+              {/* Profile Selection */}
+              <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm mb-8">
+                <h2 className="text-sm font-bold text-neutral-800 uppercase tracking-wider mb-4 border-b pb-2">
+                  Perfil del Evaluado
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="flex flex-col">
+                    <label className="text-xs font-semibold text-neutral-500 mb-2">Grupo de Edad</label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setAgeGroup('ADOLESCENT'); handleProfileChange(); }}
+                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+                          ageGroup === 'ADOLESCENT' 
+                          ? 'bg-neutral-800 text-white shadow-md' 
+                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                        }`}
+                      >
+                        Adolescentes
+                      </button>
+                      <button
+                        onClick={() => { setAgeGroup('ADULT'); handleProfileChange(); }}
+                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+                          ageGroup === 'ADULT' 
+                          ? 'bg-neutral-800 text-white shadow-md' 
+                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                        }`}
+                      >
+                        Adultos
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <label className="text-xs font-semibold text-neutral-500 mb-2">Sexo</label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setGender('MALE'); handleProfileChange(); }}
+                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+                          gender === 'MALE' 
+                          ? 'bg-accent text-white shadow-md' 
+                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                        }`}
+                      >
+                        Varón
+                      </button>
+                      <button
+                        onClick={() => { setGender('FEMALE'); handleProfileChange(); }}
+                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+                          gender === 'FEMALE' 
+                          ? 'bg-accent text-white shadow-md' 
+                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                        }`}
+                      >
+                        Mujer
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <InputGrid 
+                  title="Ansiedad Estado (A-E)"
+                  startIndex={1}
+                  endIndex={20}
+                  reversedIndices={REVERSED_STATE}
+                  values={answers}
+                  onChange={handleValueChange}
+                  description="Valora cómo te sientes AHORA MISMO (0-3). Los ítems marcados (*) son inversos."
+                />
+                
+                <InputGrid 
+                  title="Ansiedad Rasgo (A-R)"
+                  startIndex={21}
+                  endIndex={40}
+                  reversedIndices={REVERSED_TRAIT}
+                  values={answers}
+                  onChange={handleValueChange}
+                  description="Valora cómo te sientes EN GENERAL (0-3). Los ítems marcados (*) son inversos."
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 mt-8">
+                <button 
+                  onClick={resetForm}
+                  className="px-6 py-2.5 rounded-lg border border-neutral-300 text-neutral-600 font-medium hover:bg-neutral-50 transition-colors"
+                >
+                  Borrar Todo
+                </button>
+                <button 
+                  onClick={calculateResults}
+                  className="px-6 py-2.5 rounded-lg bg-neutral-900 text-white font-medium hover:bg-neutral-800 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                >
+                  Calcular Resultados
+                </button>
+              </div>
+
+              <div id="results-anchor">
+                {result && <ResultsPanel results={result} />}
+              </div>
+
+              <footer className="mt-16 pt-8 border-t border-neutral-200 text-center text-neutral-400 text-xs">
+                <p className="mb-2"><strong>Referencias:</strong> Spielberger, C. D., Gorsuch, R. L., & Lushene, R. E. (1982). Manual del STAI.</p>
+                <p>Adaptación digital para uso experimental y educativo.</p>
+              </footer>
+            </div>
+          </div>
+        );
+      };
+
+      // --- RENDER ---
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(
+        <React.StrictMode>
+          <App />
+        </React.StrictMode>
+      );
+    </script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
